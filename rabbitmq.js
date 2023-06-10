@@ -1,46 +1,67 @@
 const amqp = require('amqplib');
 
-const rabbitSettings = {
-  protocol: 'amqp',
-  hostname: 'localhost',
-  port: 5672,
-  username: 'jona',
-  password: 'jona',
-  vhost: '/',
-  authMechanism: ['PLAIN','AMQPLAIN','EXTERNAL']
-};
+class RabbitMQManager {
+  constructor() {
+    this.connection = null;
+    this.channel = null;
+  }
 
-async function connect() {
-  try {
-    const url = `${rabbitSettings.protocol}://${rabbitSettings.username}:${rabbitSettings.password}@${rabbitSettings.hostname}:${rabbitSettings.port}${rabbitSettings.vhost}`;
-    const connection = await amqp.connect(url);
-    const channel = await connection.createChannel();
+  async connect() {
+    try {
+      const rabbitSettings = {
+        protocol: 'amqp',
+        hostname: 'localhost',
+        port: 5672,
+        username: 'jona',
+        password: 'jona',
+        vhost: '/',
+        authMechanism: ['PLAIN', 'AMQPLAIN', 'EXTERNAL']
+      };
 
-    // Configurar la cola y el intercambio
-    const queueName = 'notifications_queue';
-    const exchangeName = 'notifications_exchange';
+      const url = `${rabbitSettings.protocol}://${rabbitSettings.username}:${rabbitSettings.password}@${rabbitSettings.hostname}:${rabbitSettings.port}${rabbitSettings.vhost}`;
+      this.connection = await amqp.connect(url);
+      this.channel = await this.connection.createChannel();
 
-    await channel.assertQueue(queueName, { durable: true });
-    await channel.assertExchange(exchangeName, 'direct', { durable: true });
-    await channel.bindQueue(queueName, exchangeName, 'notifications');
+      // Configurar la cola y el intercambio
+      const queueName = 'notifications_queue';
+      const exchangeName = 'notifications_exchange';
 
-    // Consumir mensajes de la cola
-    channel.consume(queueName, (msg) => {
-      const notification = JSON.parse(msg.content.toString());
+      await this.channel.assertQueue(queueName, { durable: true });
+      await this.channel.assertExchange(exchangeName, 'direct', { durable: true });
+      await this.channel.bindQueue(queueName, exchangeName, 'notifications');
 
-      // Procesar la notificación aquí, por ejemplo, enviar un correo electrónico o una notificación push
+      console.log('Conexión exitosa con RabbitMQ');
+    } catch (error) {
+      console.error('Error al establecer conexión con RabbitMQ:', error);
+      throw error;
+    }
+  }
+  async consumeMessages(queueName) {
+    try {
+      const handleMessage = async (msg) => {
+        const message = JSON.parse(msg.content.toString());
+        console.log('Mensaje recibido:', message);
+        // Aquí puedes agregar la lógica para procesar el mensaje recibido
 
-      console.log('Notificación recibida:', notification);
+        this.channel.ack(msg);
+      };
 
-      channel.ack(msg); // Confirmar el procesamiento del mensaje
-    });
+      await this.channel.consume(queueName, handleMessage);
 
-    console.log('Conexión exitosa con RabbitMQ');
-  } catch (error) {
-    console.error('Error al establecer conexión con RabbitMQ:', error);
+    } catch (error) {
+      console.error('Error al consumir mensajes:', error);
+      throw error;
+    }
+  }
+
+  getChannel() {
+    if (!this.channel) {
+      throw new Error('La conexión a RabbitMQ no ha sido establecida');
+    }
+    return this.channel;
   }
 }
 
-module.exports = {
-  connect
-};
+const rabbitMQManager = new RabbitMQManager();
+
+module.exports = rabbitMQManager;

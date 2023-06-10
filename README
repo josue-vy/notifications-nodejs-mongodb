@@ -13,3 +13,7 @@ pasword: guest
 update
 username: josue
 pasword: josue12345
+
+post http://localhost:3000/notifications
+post http://localhost:3000/users
+get http://localhost:3000/api/notifications
